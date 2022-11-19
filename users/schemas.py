@@ -3,10 +3,13 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-class UserRegister(BaseModel):
+class UserUpdate(BaseModel):
     username: str
     first_name: str
     last_name: str
+
+
+class UserRegister(UserUpdate):
     password: str = Field(min_length=8, max_length=20)
 
 
@@ -33,7 +36,6 @@ class Refill(BaseModel):
 
 
 class Transfer(Refill):
-    user_from: int
     user_to: int
 
 
