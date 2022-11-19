@@ -18,7 +18,7 @@ from .security import authenticate_user, get_current_active_user, signJWT
 users_router = APIRouter(prefix="/users", tags=["users"])
 
 
-@users_router.get("/history")
+@users_router.get("/history", response_model=list[HistoryConvert_Pydantic], status_code=200)
 async def get_history(current_user: Users = Depends(get_current_active_user)):
     """
     История всех транзакций
@@ -26,7 +26,7 @@ async def get_history(current_user: Users = Depends(get_current_active_user)):
     return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.all())
 
 
-@users_router.get("/history/{user_id}")
+@users_router.get("/history/{user_id}", response_model=list[HistoryConvert_Pydantic], status_code=200)
 async def get_user_history(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
     История всех транзакций пользователя
@@ -34,7 +34,15 @@ async def get_user_history(user_id: int, current_user: Users = Depends(get_curre
     return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.filter(user_id=user_id))
 
 
-@users_router.get("/unapproved", response_model=list[UserApproved])
+@users_router.get("/checks/{user_id}", response_model=list[CreateCheck], status_code=200)
+async def get_user_checks(user_id: int, current_user: Users = Depends(get_current_active_user)):
+    """
+    Счета пользователя
+    """
+    return await Checks.filter(user_id=user_id)
+
+
+@users_router.get("/unapproved", response_model=list[UserApproved], status_code=200)
 async def get_unapproved_users(current_user: Users = Depends(get_current_active_user)):
     """
     Список неподтверждённых пользователей
@@ -51,7 +59,7 @@ async def get_unapproved_users(current_user: Users = Depends(get_current_active_
     )
 
 
-@users_router.get("/approved", response_model=list[UserApproved])
+@users_router.get("/approved", response_model=list[UserApproved], status_code=200)
 async def get_approved_users(current_user: Users = Depends(get_current_active_user)):
     """
     Список подтверждённых пользователей
@@ -128,7 +136,7 @@ async def create_check(currency: CurrencyType, current_user: Users = Depends(get
     return CreateCheck.from_orm(new_check)
 
 
-@users_router.put("/convert", status_code=200)
+@users_router.put("/convert", response_model=list[ConverterCurrency], status_code=200)
 async def convert_currency(
         type_from: CurrencyType,
         type_to: CurrencyType,
@@ -138,7 +146,6 @@ async def convert_currency(
     """
     Конвертация валют
     """
-
     is_check_from = await Checks.get_or_none(user_id=current_user.id, currency_type=type_from, is_open=True)
     if not is_check_from:
         raise HTTPException(
