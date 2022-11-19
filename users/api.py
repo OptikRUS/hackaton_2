@@ -4,7 +4,7 @@ from tortoise.transactions import in_transaction
 from tortoise.exceptions import OperationalError
 
 from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic
-from .schemas import UserRegister, UserApproved, UserBlocked, Transfer
+from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Refill
 from .security import get_current_user
 from .hashing import get_hasher
 
@@ -64,7 +64,7 @@ async def user_register(user: UserRegister):
     _user = await Users.get_or_none(username=user.username)
     if _user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Пользователь {user.username} уже существует"
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Пользователь {_user.username} уже существует"
         )
     new_user = await Users.create(**user.dict(exclude_unset=True))
 
@@ -72,6 +72,29 @@ async def user_register(user: UserRegister):
     new_check = await Checks.create()
     await new_check.user_id.add(new_user)
     return await User_Pydantic.from_tortoise_orm(new_user)
+
+
+@users_router.put("/refill", status_code=201)
+async def user_register(user_id: int, ):
+    """
+    Пополнение баланса
+    """
+    _user = await Users.get_or_none(id=user_id)
+
+    if not _user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    if not _user.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Пользователь {_user.username} не подтверждён"
+        )
+    if not _user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Пользователь {_user.username} заблокирован"
+        )
+
 
 
 @users_router.patch("/approve/{user_id}", response_model=UserApproved, status_code=200)

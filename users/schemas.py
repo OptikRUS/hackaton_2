@@ -26,11 +26,14 @@ class UserBlocked(UserResponse):
     is_active: bool
 
 
-class Transfer(BaseModel):
-    user_from: int
-    user_to: int
+class Refill(BaseModel):
     value: float
     currency_type: str = Field('RUB')
+
+
+class Transfer(Refill):
+    user_from: int
+    user_to: int
 
 
 # class Login(BaseModel):
