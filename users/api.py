@@ -26,6 +26,14 @@ async def get_history(current_user: Users = Depends(get_current_active_user)):
     return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.all())
 
 
+@users_router.get("/history/{user_id}")
+async def get_user_history(user_id: int, current_user: Users = Depends(get_current_active_user)):
+    """
+    История всех транзакций пользователя
+    """
+    return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.filter(user_id=user_id))
+
+
 @users_router.get("/unapproved", response_model=list[UserApproved])
 async def get_unapproved_users(current_user: Users = Depends(get_current_active_user)):
     """

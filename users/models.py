@@ -66,15 +66,12 @@ class HistoryConvert(models.Model):
     Истории конвертаций
     """
     id = fields.IntField(pk=True)
-    user_id = fields.ForeignKeyField('models.Users', related_name='users_id')
+    user_id = fields.ForeignKeyField('models.Users')
     currency_type_from = fields.CharEnumField(CurrencyType)
     currency_type_to = fields.CharEnumField(CurrencyType)
     value_to = fields.DecimalField(max_digits=100, decimal_places=2)
     value_from = fields.DecimalField(max_digits=100, decimal_places=2)
     created_at = fields.DatetimeField(auto_now_add=True)
-
-    class PydanticMeta:
-        exclude = ["id"]
 
 
 User_Pydantic = pydantic_model_creator(Users, name="User")
