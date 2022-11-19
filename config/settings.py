@@ -44,7 +44,7 @@ class AuthSettings(BaseSettings):
     type: str = Field("Bearer")
     password_time: int = Field(3)
     algorithm: str = Field("HS256")
-    expires: int = Field(60 * 24 * 30)
+    expires: int = Field(60*60)
     hasher_deprecated: str = Field("auto")
     hasher_schemes: list[str] = Field(["bcrypt"])
 
