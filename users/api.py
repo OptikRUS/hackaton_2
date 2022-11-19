@@ -247,6 +247,37 @@ async def user_refill(
     return check
 
 
+@users_router.patch("/unfill", response_model=CurrencyUpdate, status_code=200)
+async def user_unfill(
+        amount: Decimal, currency: CurrencyType, current_user: Users = Depends(get_current_active_user)
+):
+    """
+    Вывод средств с счёта
+    """
+    if currency != CurrencyType.RUB:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Для вывода средств пока доступно только {CurrencyType.RUB.name}"
+        )
+    if not current_user.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Пользователь {current_user.username} не подтверждён"
+        )
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Пользователь {current_user.username} заблокирован"
+        )
+    # проверка существования счёта
+    check = await Checks.get_or_none(user_id=current_user.id, is_open=True, currency_type=currency.name)
+    if not check:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Открытые счета не найдены")
+    check.value -= amount
+    await check.save()
+    return check
+
+
 @users_router.patch("/approve/{user_id}", response_model=UserApproved, status_code=200)
 async def user_approve(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
