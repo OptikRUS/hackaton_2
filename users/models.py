@@ -30,7 +30,7 @@ class Users(models.Model):
 
     class PydanticMeta:
         computed = ["full_name"]
-        exclude = ["password", "is_superuser"]
+        exclude = ["password"]
 
 
 class Checks(models.Model):

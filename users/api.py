@@ -96,7 +96,6 @@ async def user_register(user_id: int, ):
         )
 
 
-
 @users_router.patch("/approve/{user_id}", response_model=UserApproved, status_code=200)
 async def user_approve(user_id: int):
     """
