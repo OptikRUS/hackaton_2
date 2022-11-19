@@ -55,7 +55,7 @@ async def get_approved_users(current_user: Users = Depends(get_current_active_us
 
 
 @users_router.post('/token', response_model=Token)
-async def login_for_access_token(form_data: Login):
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
