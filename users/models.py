@@ -61,6 +61,23 @@ class Transfers(models.Model):
         exclude = ["id"]
 
 
+class HistoryConvert(models.Model):
+    """
+    Истории конвертаций
+    """
+    id = fields.IntField(pk=True)
+    user_id = fields.ForeignKeyField('models.Users', related_name='users_id')
+    currency_type_from = fields.CharEnumField(CurrencyType)
+    currency_type_to = fields.CharEnumField(CurrencyType)
+    value_to = fields.DecimalField(max_digits=100, decimal_places=2)
+    value_from = fields.DecimalField(max_digits=100, decimal_places=2)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class PydanticMeta:
+        exclude = ["id"]
+
+
 User_Pydantic = pydantic_model_creator(Users, name="User")
 UserIn_Pydantic = pydantic_model_creator(Users, name="UserIn", exclude_readonly=True)
 TransfersIn_Pydantic = pydantic_model_creator(Transfers, name="TransfersIn")
+HistoryConvert_Pydantic = pydantic_model_creator(HistoryConvert, name="HistoryConvert")

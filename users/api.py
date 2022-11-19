@@ -6,7 +6,7 @@ from tortoise.contrib.fastapi import HTTPNotFoundError
 from tortoise.transactions import in_transaction
 from tortoise.exceptions import OperationalError
 
-from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic
+from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic, HistoryConvert_Pydantic, HistoryConvert
 from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, Login, UserUpdate, Refill
 from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency
 from .converter import currency_converter
@@ -18,13 +18,12 @@ from .security import authenticate_user, get_current_active_user, signJWT
 users_router = APIRouter(prefix="/users", tags=["users"])
 
 
-@users_router.get("/", response_model=list[User_Pydantic])
-async def get_users(current_user: Users = Depends(get_current_active_user)):
+@users_router.get("/history")
+async def get_history(current_user: Users = Depends(get_current_active_user)):
     """
-    Все пользователи
+    История всех транзакций
     """
-
-    return await User_Pydantic.from_queryset(Users.all())
+    return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.all())
 
 
 @users_router.get("/unapproved", response_model=list[UserApproved])
@@ -33,7 +32,7 @@ async def get_unapproved_users(current_user: Users = Depends(get_current_active_
     Список неподтверждённых пользователей
     """
     if current_user.is_superuser:
-        users_list = await Users.filter(is_approved=False).all()
+        users_list = await Users.filter(is_approved=False, is_superuser=False).all()
         if users_list:
             return users_list
         raise HTTPException(
@@ -50,7 +49,7 @@ async def get_approved_users(current_user: Users = Depends(get_current_active_us
     Список подтверждённых пользователей
     """
     if current_user.is_superuser:
-        users_list = await Users.filter(is_approved=True).all()
+        users_list = await Users.filter(is_approved=True, is_superuser=False).all()
         if users_list:
             return users_list
         raise HTTPException(
@@ -159,6 +158,13 @@ async def convert_currency(
         async with in_transaction() as connection:
             await is_check_from.save(using_db=connection)
             await is_check_to.save(using_db=connection)
+            await HistoryConvert.create(
+                user_id=current_user,
+                currency_type_from=type_from,
+                currency_type_to=type_to,
+                value_from=value,
+                value_to=converter_value
+            )
             return await Checks.filter(user_id=current_user.id).all()
 
     except OperationalError as e:
@@ -166,7 +172,7 @@ async def convert_currency(
 
 
 @users_router.patch("/refill", response_model=CurrencyUpdate, status_code=200)
-async def user_refill(currency_data: Refill, current_user: Users = Depends(get_current_active_user)):
+async def user_refill(amount: Decimal, currency: CurrencyType, current_user: Users = Depends(get_current_active_user)):
     """
     Пополнение баланса
     """
@@ -182,10 +188,10 @@ async def user_refill(currency_data: Refill, current_user: Users = Depends(get_c
             detail=f"Пользователь {current_user.username} заблокирован"
         )
     # проверка существования счёта
-    check = await Checks.get_or_none(user_id=current_user.id, is_open=True, currency_type=currency_data.currency_type)
+    check = await Checks.get_or_none(user_id=current_user.id, is_open=True, currency_type=currency.name)
     if not check:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Открытые счета не найдены")
-    check.value += currency_data.value
+    check.value += amount
     await check.save()
     return check
 
