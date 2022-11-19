@@ -8,7 +8,7 @@ from tortoise.exceptions import OperationalError
 
 from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic, HistoryConvert_Pydantic, HistoryConvert
 from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, Login, UserUpdate, Refill
-from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency
+from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency, CurrencyList
 from .converter import currency_converter, currency_list
 
 from .hashing import get_hasher
@@ -18,7 +18,7 @@ from .security import authenticate_user, get_current_active_user, signJWT
 users_router = APIRouter(prefix="/users", tags=["users"])
 
 
-@users_router.get("/currency_types", status_code=200)
+@users_router.get("/currency_types", response_model=CurrencyList, status_code=200)
 async def get_currency_types(current_user: Users = Depends(get_current_active_user)):
     """
     Расшифровка кодов валют

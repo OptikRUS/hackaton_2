@@ -46,6 +46,11 @@ class CurrencyType(str, Enum):
     ZWL = "ZWL"
 
 
+class CurrencyList(BaseModel):
+    success: bool
+    currencies: dict = Field('{"RUB": "Russian Ruble"}')
+
+
 class CreateCurrency(BaseModel):
     value: Decimal = Field('100')
     currency_type: CurrencyType
