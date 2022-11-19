@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
 from tortoise.contrib.fastapi import HTTPNotFoundError
 from tortoise.transactions import in_transaction
 from tortoise.exceptions import OperationalError
 
 from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic
-from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Refill
-from .security import get_current_user
+from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, Login
 from .hashing import get_hasher
-
+from .security import authenticate_user, get_current_active_user, signJWT
 
 from pydantic import BaseModel
 
@@ -20,7 +20,7 @@ users_router = APIRouter(prefix="/users", tags=["users"])
 
 
 @users_router.get("/", response_model=list[User_Pydantic])
-async def get_users(current_user=Depends(get_current_user)):
+async def get_users(current_user: Users = Depends(get_current_active_user)):
     """
     Все пользователи
     """
@@ -29,7 +29,7 @@ async def get_users(current_user=Depends(get_current_user)):
 
 
 @users_router.get("/unapproved", response_model=list[UserApproved])
-async def get_unapproved_users():
+async def get_unapproved_users(current_user: Users = Depends(get_current_active_user)):
     """
     Список неподтверждённых пользователей
     """
@@ -42,7 +42,7 @@ async def get_unapproved_users():
 
 
 @users_router.get("/approved", response_model=list[UserApproved])
-async def get_approved_users():
+async def get_approved_users(current_user: Users = Depends(get_current_active_user)):
     """
     Список подтверждённых пользователей
     """
@@ -52,6 +52,19 @@ async def get_approved_users():
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND, detail=f"Нет подтверждённых пользователей"
     )
+
+
+@users_router.post('/token', response_model=Token)
+async def login_for_access_token(form_data: Login):
+    user = await authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = signJWT(username=form_data.username)
+    return access_token
 
 
 @users_router.post("/register", response_model=User_Pydantic, status_code=201)
@@ -98,7 +111,7 @@ async def user_register(user_id: int, ):
 
 
 @users_router.patch("/approve/{user_id}", response_model=UserApproved, status_code=200)
-async def user_approve(user_id: int):
+async def user_approve(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
     Подтвержени пользователя администратором
     """
@@ -112,7 +125,7 @@ async def user_approve(user_id: int):
 
 
 @users_router.patch("/block/{user_id}", response_model=UserBlocked, status_code=200)
-async def user_block(user_id: int):
+async def user_block(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
     Блокировка пользователя администратором
     """
@@ -166,7 +179,7 @@ async def create_transfer(transfer_data: Transfer):
 @users_router.get(
     "/{user_id}", response_model=User_Pydantic, responses={404: {"model": HTTPNotFoundError}}
 )
-async def get_user(user_id: int):
+async def get_user(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
     Получить пользователя
     """
@@ -187,7 +200,7 @@ async def login(username: str):
 @users_router.put(
     "/{user_id}", response_model=User_Pydantic, responses={404: {"model": HTTPNotFoundError}}
 )
-async def update_user(user_id: int, user: UserIn_Pydantic):
+async def update_user(user_id: int, user: UserIn_Pydantic, current_user: Users = Depends(get_current_active_user)):
     """
     Изменить информацию пользователя
     """
@@ -197,7 +210,7 @@ async def update_user(user_id: int, user: UserIn_Pydantic):
 
 
 @users_router.delete("/{user_id}", response_model=Status, responses={404: {"model": HTTPNotFoundError}})
-async def delete_user(user_id: int):
+async def delete_user(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
     Удалить пользователя
     """
