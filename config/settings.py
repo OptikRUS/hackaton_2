@@ -64,3 +64,7 @@ class CORSSettings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+
+class CurrencyApiSettings(BaseSettings):
+    apikey: str = Field("taPxAI02BK4NITCwpZxqiCy3nDNXdtzs", env="API_KEY")
