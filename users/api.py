@@ -9,13 +9,26 @@ from tortoise.exceptions import OperationalError
 from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic, HistoryConvert_Pydantic, HistoryConvert
 from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, Login, UserUpdate, Refill
 from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency
-from .converter import currency_converter
+from .converter import currency_converter, currency_list
 
 from .hashing import get_hasher
 from .security import authenticate_user, get_current_active_user, signJWT
 
 
 users_router = APIRouter(prefix="/users", tags=["users"])
+
+
+@users_router.get("/currency_types", status_code=200)
+async def get_currency_types(current_user: Users = Depends(get_current_active_user)):
+    """
+    Расшифровка кодов валют
+    """
+    try:
+        return await currency_list()
+    except ReadTimeout:
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+        )
 
 
 @users_router.get("/history", response_model=list[HistoryConvert_Pydantic], status_code=200)

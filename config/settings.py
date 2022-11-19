@@ -68,3 +68,5 @@ class CORSSettings(BaseSettings):
 
 class CurrencyApiSettings(BaseSettings):
     apikey: str = Field("taPxAI02BK4NITCwpZxqiCy3nDNXdtzs", env="API_KEY")
+    url: str = Field("https://api.apilayer.com/currency_data/convert", env="API_URL")
+    currency_list_url: str = Field("https://api.apilayer.com/currency_data/list", env="API_ENCODE_URL")
