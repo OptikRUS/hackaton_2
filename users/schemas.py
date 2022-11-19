@@ -31,15 +31,14 @@ class Transfer(BaseModel):
     value: int
 
 
-# class Login(BaseModel):
-#     username: str
-#     password: str
+class Login(BaseModel):
+    username: str
+    password: str
 #
 #
-# class Token(BaseModel):
-#     access_token: str
-#     token_type: str
-#
-#
-# class TokenData(BaseModel):
-#     username: str = None
+class Token(BaseModel):
+    access_token: str
+
+
+class TokenData(BaseModel):
+    username: str = None
