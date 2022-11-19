@@ -1,21 +1,18 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
+from httpx import ReadTimeout
+from pydantic.types import Decimal
 from tortoise.contrib.fastapi import HTTPNotFoundError
 from tortoise.transactions import in_transaction
 from tortoise.exceptions import OperationalError
 
 from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic
 from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, Login, UserUpdate, Refill
-from .currency import CurrencyUpdate, CreateCurrency, CreateCheck, CurrencyType
+from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency
+from .converter import currency_converter
 
 from .hashing import get_hasher
 from .security import authenticate_user, get_current_active_user, signJWT
-
-from pydantic import BaseModel
-
-
-class Status(BaseModel):
-    message: str
 
 
 users_router = APIRouter(prefix="/users", tags=["users"])
@@ -98,7 +95,7 @@ async def user_register(user: UserRegister):
 
 
 @users_router.post("/create_check", response_model=CreateCheck, status_code=201)
-async def user_register(currency: CurrencyType, current_user: Users = Depends(get_current_active_user)):
+async def create_check(currency: CurrencyType, current_user: Users = Depends(get_current_active_user)):
     """
     Регистрация нового счёта
     """
@@ -124,7 +121,51 @@ async def user_register(currency: CurrencyType, current_user: Users = Depends(ge
     return CreateCheck.from_orm(new_check)
 
 
-@users_router.put("/refill", response_model=CurrencyUpdate, status_code=200)
+@users_router.put("/convert", status_code=200)
+async def convert_currency(
+        type_from: CurrencyType,
+        type_to: CurrencyType,
+        value: Decimal,
+        current_user: Users = Depends(get_current_active_user)
+):
+    """
+    Конвертация валют
+    """
+
+    is_check_from = await Checks.get_or_none(user_id=current_user.id, currency_type=type_from, is_open=True)
+    if not is_check_from:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"У вас нет {type_from.name} счёта или он закрыт"
+        )
+    is_check_to = await Checks.get_or_none(user_id=current_user.id, currency_type=type_to, is_open=True)
+    if not is_check_to:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"У вас нет {type_to.name} счёта или он закрыт"
+        )
+    try:
+        convert = await currency_converter(
+            currency_from=type_from.name, currency_to=type_to.name, value=str(value)
+        )
+    except ReadTimeout:
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+        )
+    converter_value = Decimal(convert.get("result"))
+    is_check_from.value -= value
+    is_check_to.value += converter_value
+    try:
+        async with in_transaction() as connection:
+            await is_check_from.save(using_db=connection)
+            await is_check_to.save(using_db=connection)
+            return await Checks.filter(user_id=current_user.id).all()
+
+    except OperationalError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@users_router.patch("/refill", response_model=CurrencyUpdate, status_code=200)
 async def user_refill(currency_data: Refill, current_user: Users = Depends(get_current_active_user)):
     """
     Пополнение баланса
@@ -185,7 +226,7 @@ async def user_block(user_id: int, current_user: Users = Depends(get_current_act
     )
 
 
-@users_router.put(
+@users_router.patch(
     "/transfer", response_model=TransfersIn_Pydantic, status_code=200
 )
 async def create_transfer(transfer_data: Transfer, current_user: Users = Depends(get_current_active_user)):
@@ -219,7 +260,7 @@ async def create_transfer(transfer_data: Transfer, current_user: Users = Depends
             return await TransfersIn_Pydantic.from_tortoise_orm(transfer)
 
     except OperationalError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @users_router.get(

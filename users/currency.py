@@ -28,3 +28,9 @@ class CurrencyUpdate(CreateCurrency):
     id: int
     updated_at: datetime
 
+
+class ConverterCurrency(CreateCurrency):
+    id: int
+    currency_type: CurrencyType
+    value: Decimal
+    updated_at: datetime

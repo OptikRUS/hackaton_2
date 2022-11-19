@@ -25,6 +25,7 @@ class UserResponse(BaseModel):
 class UserApproved(UserResponse):
     id: int
     is_approved: bool
+    is_active: bool
 
 
 class UserBlocked(UserResponse):
