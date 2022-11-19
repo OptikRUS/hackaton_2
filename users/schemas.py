@@ -19,6 +19,7 @@ class UserResponse(BaseModel):
 
 
 class UserApproved(UserResponse):
+    id: int
     is_approved: bool
 
 
@@ -39,8 +40,8 @@ class Transfer(Refill):
 class Login(BaseModel):
     username: str
     password: str
-#
-#
+
+
 class Token(BaseModel):
     access_token: str
 
