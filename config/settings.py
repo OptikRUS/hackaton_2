@@ -4,6 +4,7 @@ from pydantic import BaseSettings, Field
 class SiteSettings(BaseSettings):
     host: str = Field("127.0.0.1", env="SITE_HOST")
     port: int = Field(8000, env="SITE_PORT")
+    # reload: bool = Field(True, env="SITE_RELOAD")
 
     class Config:
         env_file = ".env"

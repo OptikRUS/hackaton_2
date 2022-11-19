@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from tortoise.contrib.fastapi import HTTPNotFoundError
 
-from .models import User_Pydantic, Users, UserIn_Pydantic
-from .schemas import UserRegister
+from .models import User_Pydantic, Users, UserIn_Pydantic, Checks
+from .schemas import UserRegister, UserApproved
 from .security import get_current_user
 from .hashing import get_hasher
 
@@ -33,11 +33,32 @@ async def user_register(user: UserRegister):
     """
     password_hash = get_hasher()
     user.password = password_hash.hash(user.password)
-    _user = await Users.filter(username=user.username)
+    _user = await Users.get_or_none(username=user.username)
+    print()
     if _user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"User {user.username} already exist")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Пользователь {user.username} уже существует"
+        )
     new_user = await Users.create(**user.dict(exclude_unset=True))
+
+    # создание нового счёта
+    check = await Checks.create()
+    await check.user_id.add(new_user)
     return await User_Pydantic.from_tortoise_orm(new_user)
+
+
+@users_router.patch("/approve/{user_id}", response_model=UserApproved, status_code=200)
+async def user_register(user_id: int):
+    """
+    Подтвержени пользователя администратором
+    """
+    _user = await Users.filter(id=user_id, is_approved=False).update(is_approved=True)
+    if not _user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Пользователь не найден или уже подтверждён"
+        )
+    user = await Users.get(id=user_id)
+    return UserApproved.from_orm(user)
 
 
 @users_router.get(

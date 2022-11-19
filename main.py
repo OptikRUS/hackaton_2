@@ -19,4 +19,4 @@ app.include_router(users_router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, **site_config)
+    uvicorn.run("main:app", **site_config)
