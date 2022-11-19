@@ -51,12 +51,16 @@ class Transfers(models.Model):
     Транзакции пользователей
     """
     id = fields.IntField(pk=True)
-    user_from = fields.ForeignKeyField('models.Users', related_name='user_from')
     user_to = fields.ForeignKeyField('models.Users', related_name='user_to')
-    value = fields.DecimalField(max_digits=100, decimal_places=2, default=0)
+    user_from = fields.ForeignKeyField('models.Users', related_name='user_from')
+    value = fields.DecimalField(max_digits=100, decimal_places=2)
     currency_type = fields.CharEnumField(CurrencyType, default=CurrencyType.RUB)
-    updated_at = fields.DatetimeField(auto_now=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class PydanticMeta:
+        exclude = ["id"]
 
 
 User_Pydantic = pydantic_model_creator(Users, name="User")
 UserIn_Pydantic = pydantic_model_creator(Users, name="UserIn", exclude_readonly=True)
+TransfersIn_Pydantic = pydantic_model_creator(Transfers, name="TransfersIn")

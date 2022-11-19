@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -28,7 +29,8 @@ class UserBlocked(UserResponse):
 class Transfer(BaseModel):
     user_from: int
     user_to: int
-    value: int
+    value: float
+    currency_type: str = Field('RUB')
 
 
 # class Login(BaseModel):

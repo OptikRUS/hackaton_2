@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from tortoise.contrib.fastapi import HTTPNotFoundError
+from tortoise.transactions import in_transaction
+from tortoise.exceptions import OperationalError
 
-from .models import User_Pydantic, Users, UserIn_Pydantic, Checks
+from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic
 from .schemas import UserRegister, UserApproved, UserBlocked, Transfer
 from .security import get_current_user
 from .hashing import get_hasher
@@ -94,22 +96,48 @@ async def user_block(user_id: int):
     _user = await Users.filter(id=user_id, is_active=True).update(is_active=False)
     if not _user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"Пользователь не найден или уже заблокирован]"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Пользователь не найден или уже заблокирован"
         )
     user = await Users.get(id=user_id)
     return UserBlocked.from_orm(user)
 
 
-# @users_router.put(
-#     "/transfer", response_model=Transfer, responses={404: {"model": HTTPNotFoundError}}
-# )
-# async def update_transfer(user_id: int, user: UserIn_Pydantic):
-#     """
-#     Перевод
-#     """
-#
-#     await Users.filter(id=user_id).update(**user.dict(exclude_unset=True))
-#     return await User_Pydantic.from_queryset_single(Users.get(id=user_id))
+@users_router.put(
+    "/transfer", response_model=TransfersIn_Pydantic, status_code=200
+)
+async def create_transfer(transfer_data: Transfer):
+    """
+    Перевод
+    """
+    # проверка отправителя
+    user_from = await Users.get_or_none(id=transfer_data.user_from)
+    if not user_from:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Поулчатель не найден, заблокирован или не подтверждён"
+        )
+
+    # проверка получателя
+    user_to = await Users.get_or_none(id=transfer_data.user_to, is_active=True, is_approved=True)
+    if not user_to:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Отправитель не найден, заблокирован или не подтверждён"
+        )
+
+    try:
+        async with in_transaction() as connection:
+            transfer = Transfers(
+                user_from=user_from,
+                user_to=user_to,
+                value=transfer_data.value,
+                currency_type=transfer_data.currency_type
+            )
+            await transfer.save(using_db=connection)
+            return await TransfersIn_Pydantic.from_tortoise_orm(transfer)
+
+    except OperationalError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @users_router.get(
@@ -121,6 +149,16 @@ async def get_user(user_id: int):
     """
 
     return await User_Pydantic.from_queryset_single(Users.get(id=user_id))
+
+
+@users_router.get(
+    "/login/{username}", response_model=User_Pydantic, responses={404: {"model": HTTPNotFoundError}}
+)
+async def login(username: str):
+    """
+    Типа логин
+    """
+    return await User_Pydantic.from_queryset_single(Users.get(username=username))
 
 
 @users_router.put(
