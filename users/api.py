@@ -6,8 +6,9 @@ from tortoise.contrib.fastapi import HTTPNotFoundError
 from tortoise.transactions import in_transaction
 from tortoise.exceptions import OperationalError
 
-from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic, HistoryConvert_Pydantic, HistoryConvert
-from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, Login, UserUpdate, Refill
+from .models import (User_Pydantic, Users, Checks, Transfers,
+                     TransfersIn_Pydantic, HistoryConvert_Pydantic, HistoryConvert)
+from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, UserUpdate
 from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency, CurrencyList
 from .converter import currency_converter, currency_list
 
@@ -31,28 +32,44 @@ async def get_currency_types(current_user: Users = Depends(get_current_active_us
         )
 
 
-@users_router.get("/history", response_model=list[HistoryConvert_Pydantic], status_code=200)
+@users_router.get("/histories", response_model=list[HistoryConvert_Pydantic], status_code=200)
 async def get_history(current_user: Users = Depends(get_current_active_user)):
     """
     История всех транзакций
     """
-    return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.all())
+    if current_user.is_superuser:
+        return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.all())
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас нет прав для данного действия"
+    )
 
 
-@users_router.get("/history/{user_id}", response_model=list[HistoryConvert_Pydantic], status_code=200)
-async def get_user_history(user_id: int, current_user: Users = Depends(get_current_active_user)):
+@users_router.get("/history", response_model=list[HistoryConvert_Pydantic], status_code=200)
+async def get_user_history(current_user: Users = Depends(get_current_active_user)):
     """
     История всех транзакций пользователя
     """
-    return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.filter(user_id=user_id))
+    return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.filter(user_id=current_user.id))
 
 
 @users_router.get("/checks/{user_id}", response_model=list[CreateCheck], status_code=200)
 async def get_user_checks(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
+    Счета пользователя для админа
+    """
+    if current_user.is_superuser:
+        return await Checks.filter(user_id=user_id)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас нет прав для данного действия"
+    )
+
+
+@users_router.get("/checks/", response_model=list[CreateCheck], status_code=200)
+async def get_my_checks(current_user: Users = Depends(get_current_active_user)):
+    """
     Счета пользователя
     """
-    return await Checks.filter(user_id=user_id)
+    return await Checks.filter(user_id=current_user.id)
 
 
 @users_router.get("/unapproved", response_model=list[UserApproved], status_code=200)
@@ -200,11 +217,17 @@ async def convert_currency(
 
 
 @users_router.patch("/refill", response_model=CurrencyUpdate, status_code=200)
-async def user_refill(amount: Decimal, currency: CurrencyType, current_user: Users = Depends(get_current_active_user)):
+async def user_refill(
+        amount: Decimal, currency: CurrencyType, current_user: Users = Depends(get_current_active_user)
+):
     """
     Пополнение баланса
     """
-
+    if currency != CurrencyType.RUB:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Для пополнения пока доступно только {CurrencyType.RUB.name}"
+        )
     if not current_user.is_approved:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -324,7 +347,6 @@ async def update_user(user_data: UserUpdate, current_user: Users = Depends(get_c
     """
     Изменить информацию пользователя
     """
-
     await Users.filter(id=current_user.id).update(**user_data.dict(exclude_unset=True))
     return await User_Pydantic.from_queryset_single(Users.get(id=current_user.id))
 
