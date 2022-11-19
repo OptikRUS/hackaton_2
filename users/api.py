@@ -6,6 +6,8 @@ from tortoise.exceptions import OperationalError
 
 from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic
 from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, Login, UserUpdate, Refill
+from .currency import CurrencyUpdate, CreateCurrency, CreateCheck, CurrencyType
+
 from .hashing import get_hasher
 from .security import authenticate_user, get_current_active_user, signJWT
 
@@ -95,7 +97,34 @@ async def user_register(user: UserRegister):
     return await User_Pydantic.from_tortoise_orm(new_user)
 
 
-@users_router.put("/refill", status_code=200)
+@users_router.post("/create_check", status_code=201)
+async def user_register(currency: CurrencyType, current_user: Users = Depends(get_current_active_user)):
+    """
+    Регистрация нового счёта
+    """
+    is_check = await Checks.get_or_none(user_id=current_user.id, currency_type=currency)
+
+    if is_check:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"У вас уже есть {currency.name} счёт"
+        )
+
+    # дополнительная проверка на бэке
+    if not (currency in list(CurrencyType)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Вы не можете создать {currency.name} счёт"
+        )
+
+    # создание нового счёта
+    new_check = await Checks.create(currency_type=currency)
+    await new_check.user_id.add(current_user)
+    await new_check.save()
+    return new_check
+
+
+@users_router.put("/refill", response_model=CurrencyUpdate, status_code=200)
 async def user_refill(currency_data: Refill, current_user: Users = Depends(get_current_active_user)):
     """
     Пополнение баланса
@@ -114,7 +143,7 @@ async def user_refill(currency_data: Refill, current_user: Users = Depends(get_c
     # проверка существования счёта
     check = await Checks.get_or_none(user_id=current_user.id, is_open=True, currency_type=currency_data.currency_type)
     if not check:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Открыте счета не найдены")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Открытые счета не найдены")
     check.value += currency_data.value
     await check.save()
     return check
