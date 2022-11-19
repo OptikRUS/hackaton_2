@@ -34,11 +34,28 @@ class Users(models.Model):
 
 
 class Checks(models.Model):
+    """
+    Счета пользователей
+    """
     id = fields.IntField(pk=True)
     user_id = fields.ManyToManyField('models.Users', related_name='checks', through='users_checks')
     value = fields.DecimalField(max_digits=100, decimal_places=2, default=0)
     currency_type = fields.CharEnumField(CurrencyType, default=CurrencyType.RUB)
     is_open = fields.BooleanField(default=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+
+class Transfers(models.Model):
+    """
+    Транзакции пользователей
+    """
+    id = fields.IntField(pk=True)
+    user_from = fields.ForeignKeyField('models.Users', related_name='user_from')
+    user_to = fields.ForeignKeyField('models.Users', related_name='user_to')
+    value = fields.DecimalField(max_digits=100, decimal_places=2, default=0)
+    currency_type = fields.CharEnumField(CurrencyType, default=CurrencyType.RUB)
+    updated_at = fields.DatetimeField(auto_now=True)
 
 
 User_Pydantic = pydantic_model_creator(Users, name="User")

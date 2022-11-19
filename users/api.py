@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from tortoise.contrib.fastapi import HTTPNotFoundError
 
 from .models import User_Pydantic, Users, UserIn_Pydantic, Checks
-from .schemas import UserRegister, UserApproved
+from .schemas import UserRegister, UserApproved, UserBlocked
 from .security import get_current_user
 from .hashing import get_hasher
 
@@ -34,7 +34,6 @@ async def user_register(user: UserRegister):
     password_hash = get_hasher()
     user.password = password_hash.hash(user.password)
     _user = await Users.get_or_none(username=user.username)
-    print()
     if _user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"Пользователь {user.username} уже существует"
@@ -42,13 +41,13 @@ async def user_register(user: UserRegister):
     new_user = await Users.create(**user.dict(exclude_unset=True))
 
     # создание нового счёта
-    check = await Checks.create()
-    await check.user_id.add(new_user)
+    new_check = await Checks.create()
+    await new_check.user_id.add(new_user)
     return await User_Pydantic.from_tortoise_orm(new_user)
 
 
 @users_router.patch("/approve/{user_id}", response_model=UserApproved, status_code=200)
-async def user_register(user_id: int):
+async def user_approve(user_id: int):
     """
     Подтвержени пользователя администратором
     """
@@ -59,6 +58,20 @@ async def user_register(user_id: int):
         )
     user = await Users.get(id=user_id)
     return UserApproved.from_orm(user)
+
+
+@users_router.patch("/block/{user_id}", response_model=UserBlocked, status_code=200)
+async def user_block(user_id: int):
+    """
+    Блокировка пользователя администратором
+    """
+    _user = await Users.filter(id=user_id, is_active=True).update(is_active=False)
+    if not _user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Пользователь не найден или уже заблокирован]"
+        )
+    user = await Users.get(id=user_id)
+    return UserBlocked.from_orm(user)
 
 
 @users_router.get(

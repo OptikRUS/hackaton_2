@@ -9,13 +9,20 @@ class UserRegister(BaseModel):
     password: str = Field(min_length=8, max_length=20)
 
 
-class UserApproved(BaseModel):
+class UserResponse(BaseModel):
     username: str
-    is_approved: bool
     updated_at: datetime
 
     class Config:
         orm_mode = True
+
+
+class UserApproved(UserResponse):
+    is_approved: bool
+
+
+class UserBlocked(UserResponse):
+    is_active: bool
 
 
 # class Login(BaseModel):
