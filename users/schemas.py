@@ -25,6 +25,12 @@ class UserBlocked(UserResponse):
     is_active: bool
 
 
+class Transfer(BaseModel):
+    user_from: int
+    user_to: int
+    value: int
+
+
 # class Login(BaseModel):
 #     username: str
 #     password: str

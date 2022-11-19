@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from tortoise.contrib.fastapi import HTTPNotFoundError
 
 from .models import User_Pydantic, Users, UserIn_Pydantic, Checks
-from .schemas import UserRegister, UserApproved, UserBlocked
+from .schemas import UserRegister, UserApproved, UserBlocked, Transfer
 from .security import get_current_user
 from .hashing import get_hasher
 
@@ -24,6 +24,19 @@ async def get_users(current_user=Depends(get_current_user)):
     """
 
     return await User_Pydantic.from_queryset(Users.all())
+
+
+@users_router.get("/not_approved", response_model=list[UserApproved])
+async def get_unapproved_users():
+    """
+    Список неподтверждённых пользователей
+    """
+    users_list = await Users.filter(is_approved=False).all()
+    if users_list:
+        return users_list
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail=f"Нет неподтверждённых пользователей"
+    )
 
 
 @users_router.post("/register", response_model=User_Pydantic, status_code=201)
@@ -72,6 +85,18 @@ async def user_block(user_id: int):
         )
     user = await Users.get(id=user_id)
     return UserBlocked.from_orm(user)
+
+
+@users_router.put(
+    "/transfer", response_model=User_Pydantic, responses={404: {"model": HTTPNotFoundError}}
+)
+async def update_transfer(user_id: int, user: UserIn_Pydantic):
+    """
+    Перевод
+    """
+
+    await Users.filter(id=user_id).update(**user.dict(exclude_unset=True))
+    return await User_Pydantic.from_queryset_single(Users.get(id=user_id))
 
 
 @users_router.get(
