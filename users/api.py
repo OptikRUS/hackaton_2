@@ -97,7 +97,7 @@ async def user_register(user: UserRegister):
     return await User_Pydantic.from_tortoise_orm(new_user)
 
 
-@users_router.post("/create_check", status_code=201)
+@users_router.post("/create_check", response_model=CreateCheck, status_code=201)
 async def user_register(currency: CurrencyType, current_user: Users = Depends(get_current_active_user)):
     """
     Регистрация нового счёта
@@ -121,7 +121,7 @@ async def user_register(currency: CurrencyType, current_user: Users = Depends(ge
     new_check = await Checks.create(currency_type=currency)
     await new_check.user_id.add(current_user)
     await new_check.save()
-    return new_check
+    return CreateCheck.from_orm(new_check)
 
 
 @users_router.put("/refill", response_model=CurrencyUpdate, status_code=200)

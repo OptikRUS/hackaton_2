@@ -8,6 +8,7 @@ from pydantic.types import Decimal
 class CurrencyType(str, Enum):
     RUB = "RUB"
     USD = "USD"
+    EUR = "EUR"
 
 
 class CreateCurrency(BaseModel):
@@ -17,7 +18,10 @@ class CreateCurrency(BaseModel):
 
 class CreateCheck(CreateCurrency):
     id: int
-    created_at_at: datetime
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
 
 
 class CurrencyUpdate(CreateCurrency):
