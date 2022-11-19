@@ -38,7 +38,7 @@ class Checks(models.Model):
     Счета пользователей
     """
     id = fields.IntField(pk=True)
-    user_id = fields.ManyToManyField('models.Users', related_name='checks', through='users_checks')
+    user_id = fields.ManyToManyField('models.Users', related_name='user_id', through='users_checks')
     value = fields.DecimalField(max_digits=100, decimal_places=2, default=0)
     currency_type = fields.CharEnumField(CurrencyType, default=CurrencyType.RUB)
     is_open = fields.BooleanField(default=True)

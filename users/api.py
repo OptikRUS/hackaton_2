@@ -5,7 +5,7 @@ from tortoise.transactions import in_transaction
 from tortoise.exceptions import OperationalError
 
 from .models import User_Pydantic, Users, UserIn_Pydantic, Checks, Transfers, TransfersIn_Pydantic
-from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, Login, UserUpdate
+from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, Login, UserUpdate, Refill
 from .hashing import get_hasher
 from .security import authenticate_user, get_current_active_user, signJWT
 
@@ -95,27 +95,30 @@ async def user_register(user: UserRegister):
     return await User_Pydantic.from_tortoise_orm(new_user)
 
 
-@users_router.put("/refill", status_code=201)
-async def user_register(user_id: int, ):
+@users_router.put("/refill", status_code=200)
+async def user_refill(currency_data: Refill, current_user: Users = Depends(get_current_active_user)):
     """
     Пополнение баланса
     """
-    _user = await Users.get_or_none(id=user_id)
 
-    if not _user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-
-    if not _user.is_approved:
+    if not current_user.is_approved:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Пользователь {_user.username} не подтверждён"
+            detail=f"Пользователь {current_user.username} не подтверждён"
         )
-    if not _user.is_active:
+    if not current_user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Пользователь {_user.username} заблокирован"
+            detail=f"Пользователь {current_user.username} заблокирован"
         )
-###
+    # проверка существования счёта
+    check = await Checks.get_or_none(user_id=current_user.id, is_open=True, currency_type=currency_data.currency_type)
+    if not check:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Открыте счета не найдены")
+    check.value += currency_data.value
+    await check.save()
+    return check
+
 
 @users_router.patch("/approve/{user_id}", response_model=UserApproved, status_code=200)
 async def user_approve(user_id: int, current_user: Users = Depends(get_current_active_user)):

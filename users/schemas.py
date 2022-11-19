@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+from pydantic.types import Decimal
 
 
 class UserUpdate(BaseModel):
@@ -31,7 +32,7 @@ class UserBlocked(UserResponse):
 
 
 class Refill(BaseModel):
-    value: float
+    value: Decimal
     currency_type: str = Field('RUB')
 
 
