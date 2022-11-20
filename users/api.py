@@ -32,27 +32,37 @@ async def get_currency_types(current_user: Users = Depends(get_current_active_us
         )
 
 
-@users_router.get("/histories", response_model=list[HistoryConvert_Pydantic], status_code=200)
+@users_router.get("/histories", response_model=list[HistoryConvert_Pydantic] | HistoryConvert_Pydantic, status_code=200)
 async def get_history(current_user: Users = Depends(get_current_active_user)):
     """
     История всех конвертаций (только для админа)
     """
     if current_user.is_superuser:
-        return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.all())
+        histories = await HistoryConvert_Pydantic.from_queryset(HistoryConvert.all())
+        if histories:
+            return histories
+        raise HTTPException(
+            status_code=status.HTTP_200_OK, detail="Пока конвертаций не было"
+        )
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
     )
 
 
-@users_router.get("/history", response_model=list[HistoryConvert_Pydantic], status_code=200)
+@users_router.get("/history", response_model=list[HistoryConvert_Pydantic] | HistoryConvert_Pydantic, status_code=200)
 async def get_user_history(current_user: Users = Depends(get_current_active_user)):
     """
-    История всех транзакций пользователя
+    История всех ковертаций пользователя
     """
-    return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.filter(user_id=current_user.id))
+    history = await HistoryConvert_Pydantic.from_queryset(HistoryConvert.filter(user_id=current_user.id))
+    if history:
+        return history
+    raise HTTPException(
+        status_code=status.HTTP_200_OK, detail="У вас не было ещё ковертаций"
+    )
 
 
-@users_router.get("/checks/{user_id}", response_model=list[CreateCheck], status_code=200)
+@users_router.get("/checks/{user_id}", response_model=list[CreateCheck] | CreateCheck, status_code=200)
 async def get_user_checks(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
     Счета пользователя (для админа)
@@ -61,15 +71,15 @@ async def get_user_checks(user_id: int, current_user: Users = Depends(get_curren
         check = await Checks.get_or_none(user_id=user_id)
         if not check:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Нет пользователя с такими счетами"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Нет пользователя с такими счетами"
             )
         return check
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
     )
 
 
-@users_router.get("/checks/", response_model=list[CreateCheck], status_code=200)
+@users_router.get("/checks/", response_model=list[CreateCheck] | CreateCheck, status_code=200)
 async def get_my_checks(current_user: Users = Depends(get_current_active_user)):
     """
     Счета пользователя
@@ -77,7 +87,7 @@ async def get_my_checks(current_user: Users = Depends(get_current_active_user)):
     return await Checks.filter(user_id=current_user.id)
 
 
-@users_router.get("/unapproved", response_model=list[UserApproved], status_code=200)
+@users_router.get("/unapproved", response_model=list[UserApproved] | UserApproved, status_code=200)
 async def get_unapproved_users(current_user: Users = Depends(get_current_active_user)):
     """
     Список неподтверждённых пользователей (для админа)
@@ -87,14 +97,14 @@ async def get_unapproved_users(current_user: Users = Depends(get_current_active_
         if users_list:
             return users_list
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"Нет неподтверждённых пользователей"
+            status_code=status.HTTP_200_OK, detail="Пока нет неподтверждённых пользователей"
         )
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
     )
 
 
-@users_router.get("/approved", response_model=list[UserApproved], status_code=200)
+@users_router.get("/approved", response_model=list[UserApproved] | UserApproved, status_code=200)
 async def get_approved_users(current_user: Users = Depends(get_current_active_user)):
     """
     Список подтверждённых пользователей (для админа)
@@ -104,10 +114,10 @@ async def get_approved_users(current_user: Users = Depends(get_current_active_us
         if users_list:
             return users_list
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"Нет подтверждённых пользователей"
+            status_code=status.HTTP_200_OK, detail="Пока нет подтверждённых пользователей"
         )
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
     )
 
 
@@ -153,14 +163,14 @@ async def create_check(currency: CurrencyType, current_user: Users = Depends(get
 
     if is_check:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_200_OK,
             detail=f"У вас уже есть {currency.name} счёт"
         )
 
     # дополнительная проверка на бэке
     if not (currency in list(CurrencyType)):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_200_OK,
             detail=f"Вы не можете создать {currency.name} счёт"
         )
 
@@ -171,7 +181,7 @@ async def create_check(currency: CurrencyType, current_user: Users = Depends(get
     return CreateCheck.from_orm(new_check)
 
 
-@users_router.put("/convert", response_model=list[ConverterCurrency], status_code=200)
+@users_router.put("/convert", response_model=list[ConverterCurrency] | ConverterCurrency, status_code=200)
 async def convert_currency(
         type_from: CurrencyType,
         type_to: CurrencyType,
@@ -292,12 +302,12 @@ async def user_approve(user_id: int, current_user: Users = Depends(get_current_a
         _user = await Users.filter(id=user_id, is_approved=False).update(is_approved=True)
         if not _user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Пользователь не найден или уже подтверждён"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден или уже подтверждён"
             )
         user = await Users.get(id=user_id)
         return UserApproved.from_orm(user)
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
     )
 
 
