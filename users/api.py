@@ -8,7 +8,7 @@ from tortoise.exceptions import OperationalError
 
 from .models import (User_Pydantic, Users, Checks, Transfers,
                      TransfersIn_Pydantic, HistoryConvert_Pydantic, HistoryConvert)
-from .schemas import UserRegister, UserApproved, UserBlocked, Transfer, Token, UserUpdate
+from .schemas import UserRegister, UserApproved, UserBlocked, Token, UserUpdate
 from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency, CurrencyList
 from .converter import currency_converter, currency_list
 
