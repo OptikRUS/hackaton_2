@@ -179,7 +179,7 @@ class CurrencyType(str, Enum):
 
 
 class CurrencyList(BaseModel):
-    success: bool
+    success: bool = True
     currencies: dict = Field('{"RUB": "Russian Ruble"}')
 
 

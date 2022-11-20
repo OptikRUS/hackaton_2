@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
@@ -24,17 +24,14 @@ users_router = APIRouter(prefix="/users", tags=["users"])
 @users_router.get("/currency_types",
                   status_code=200,
                   response_model=CurrencyList,
-                  responses={
-                      429: {"model": status.HTTP_429_TOO_MANY_REQUESTS},
-                      404: {"model": HTTPNotFoundError}
-                  }
                   )
 async def get_currency_types(current_user: Users = Depends(get_current_active_user)):
     """
     Расшифровка кодов валют
     """
     try:
-        return await currency_list()
+        currencies = await currency_list()
+        return CurrencyList(currencies=currencies.get('symbols'))
     except ReadTimeout:
         raise HTTPException(
             status_code=status.HTTP_408_REQUEST_TIMEOUT,
@@ -225,7 +222,6 @@ async def create_check(currency: CurrencyType, current_user: Users = Depends(get
 @users_router.get("/get_price",
                   status_code=200,
                   response_model=CurrencyPrice,
-                  responses={429: {"model": status.HTTP_429_TOO_MANY_REQUESTS}}
                   )
 async def get_price(
         type_from: CurrencyType,
@@ -248,20 +244,14 @@ async def get_price(
     return CurrencyPrice(**result)
 
 
-@users_router.get("/get_fluctuation",
-                  status_code=200,
-                  responses={
-                      429: {"model": status.HTTP_429_TOO_MANY_REQUESTS},
-                      404: {"model": HTTPNotFoundError}
-                  }
-                  )
+@users_router.get("/get_fluctuation", status_code=200)
 async def get_fluctuation(
-        start_date: date, end_date: date,
         base: CurrencyType, symbols: list[CurrencyType] = Query(...),
+        start_date: date = date.today() - timedelta(days=365), end_date: date = date.today(),
         current_user: Users = Depends(get_current_active_user)
 ):
     """
-    Узнать колебания валют
+    Узнать колебания валют (по умолчанию за последний год)
     """
     try:
         convert = await currency_fluctuation(
@@ -282,10 +272,6 @@ async def get_fluctuation(
 @users_router.put("/convert",
                   status_code=200,
                   response_model=list[ConverterCurrency] | ConverterCurrency,
-                  responses={
-                      429: {"model": status.HTTP_429_TOO_MANY_REQUESTS},
-                      404: {"model": HTTPNotFoundError}
-                  }
                   )
 async def convert_currency(
         type_from: CurrencyType,
@@ -296,6 +282,12 @@ async def convert_currency(
     """
     Конвертация валют
     """
+    if type_from == type_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Вы не можете конвертировать {type_from.name} в {type_to.name}"
+        )
+
     is_check_from = await Checks.get_or_none(user_id=current_user.id, currency_type=type_from, is_open=True)
     if not is_check_from:
         raise HTTPException(
