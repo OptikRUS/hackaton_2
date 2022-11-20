@@ -1,4 +1,4 @@
-# CurrencyConverter X-Mas Hack
+# CurrencyConverter Sovcombank Team Challenge 2022
 
 ## Приложения для конвертирования валют
 

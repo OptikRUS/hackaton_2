@@ -12,7 +12,7 @@ class SiteSettings(BaseSettings):
 
 
 class ApplicationSettings(BaseSettings):
-    title: str = Field("CurrencyConverter X-Mas Hack")
+    title: str = Field("CurrencyConverter Sovcombank Team Challenge 2022")
     description = Field("Приложения для конвертирования валют")
     debug: bool = Field(False, env="DEBUG")
 
