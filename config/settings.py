@@ -14,7 +14,7 @@ class SiteSettings(BaseSettings):
 class ApplicationSettings(BaseSettings):
     title: str = Field("CurrencyConverter X-Mas Hack")
     description = Field("Приложения для конвертирования валют")
-    debug: bool = Field(True, env="DEBUG")
+    debug: bool = Field(False, env="DEBUG")
 
     class Config:
         env_file = ".env"
@@ -66,7 +66,11 @@ class CORSSettings(BaseSettings):
         env_file_encoding = "utf-8"
 
 
-class CurrencyApiSettings(BaseSettings):
+class CurrencyApiHeaders(BaseSettings):
     apikey: str = Field("taPxAI02BK4NITCwpZxqiCy3nDNXdtzs", env="API_KEY")
-    url: str = Field("https://api.apilayer.com/currency_data", env="API_URL")
-    fluctuation_url: str = Field("https://api.apilayer.com/exchangerates_data/fluctuation", env="API_FLUCTUATION_URL")
+
+
+class CurrencyApiSettings(BaseSettings):
+    apikey: str = Field(CurrencyApiHeaders().apikey)
+    headers: dict = CurrencyApiHeaders().dict()
+    url: str = Field("https://api.apilayer.com/exchangerates_data", env="API_URL")

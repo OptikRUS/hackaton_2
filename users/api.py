@@ -8,8 +8,8 @@ from tortoise.contrib.fastapi import HTTPNotFoundError
 from tortoise.transactions import in_transaction
 from tortoise.exceptions import OperationalError
 
-from .models import (User_Pydantic, Users, Checks, Transfers,
-                     TransfersIn_Pydantic, HistoryConvert_Pydantic, HistoryConvert)
+from .models import (User_Pydantic, Users, Checks, Transfers, TransfersIn_Pydantic,
+                     HistoryConvert_Pydantic, HistoryConvert)
 from .schemas import UserRegister, UserApproved, UserBlocked, Token, UserUpdate
 from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency, CurrencyList, CurrencyPrice
 from .converter import currency_converter, currency_list, currency_fluctuation
@@ -22,8 +22,12 @@ users_router = APIRouter(prefix="/users", tags=["users"])
 
 
 @users_router.get("/currency_types",
-                  # response_model=CurrencyList,
-                  status_code=200
+                  status_code=200,
+                  response_model=CurrencyList,
+                  responses={
+                      429: {"model": status.HTTP_429_TOO_MANY_REQUESTS},
+                      404: {"model": HTTPNotFoundError}
+                  }
                   )
 async def get_currency_types(current_user: Users = Depends(get_current_active_user)):
     """
@@ -37,7 +41,11 @@ async def get_currency_types(current_user: Users = Depends(get_current_active_us
         )
 
 
-@users_router.get("/histories", response_model=list[HistoryConvert_Pydantic] | HistoryConvert_Pydantic, status_code=200)
+@users_router.get("/histories",
+                  status_code=200,
+                  response_model=list[HistoryConvert_Pydantic] | HistoryConvert_Pydantic,
+                  responses={404: {"model": HTTPNotFoundError}}
+                  )
 async def get_history(current_user: Users = Depends(get_current_active_user)):
     """
     История всех конвертаций (только для админа)
@@ -47,14 +55,18 @@ async def get_history(current_user: Users = Depends(get_current_active_user)):
         if histories:
             return histories
         raise HTTPException(
-            status_code=status.HTTP_200_OK, detail="Пока конвертаций не было"
+            status_code=status.HTTP_200_OK, detail='Пока конвертаций не было'
         )
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail='У вас недостаточно прав для данного действия'
     )
 
 
-@users_router.get("/history", response_model=list[HistoryConvert_Pydantic] | HistoryConvert_Pydantic, status_code=200)
+@users_router.get("/history",
+                  status_code=200,
+                  response_model=list[HistoryConvert_Pydantic] | HistoryConvert_Pydantic,
+                  responses={404: {"model": HTTPNotFoundError}}
+                  )
 async def get_user_history(current_user: Users = Depends(get_current_active_user)):
     """
     История всех конвертаций пользователя
@@ -67,7 +79,11 @@ async def get_user_history(current_user: Users = Depends(get_current_active_user
     )
 
 
-@users_router.get("/checks/{user_id}", response_model=list[CreateCheck] | CreateCheck, status_code=200)
+@users_router.get("/checks/{user_id}",
+                  status_code=200,
+                  response_model=list[CreateCheck] | CreateCheck,
+                  responses={404: {"model": HTTPNotFoundError}}
+                  )
 async def get_user_checks(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
     Счета пользователя (для админа)
@@ -80,11 +96,15 @@ async def get_user_checks(user_id: int, current_user: Users = Depends(get_curren
             )
         return check
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail='У вас недостаточно прав для данного действия'
     )
 
 
-@users_router.get("/checks/", response_model=list[CreateCheck] | CreateCheck, status_code=200)
+@users_router.get("/checks/",
+                  status_code=200,
+                  response_model=list[CreateCheck] | CreateCheck,
+                  responses={404: {"model": HTTPNotFoundError}}
+                  )
 async def get_my_checks(current_user: Users = Depends(get_current_active_user)):
     """
     Счета пользователя
@@ -92,7 +112,11 @@ async def get_my_checks(current_user: Users = Depends(get_current_active_user)):
     return await Checks.filter(user_id=current_user.id)
 
 
-@users_router.get("/unapproved", response_model=list[UserApproved] | UserApproved, status_code=200)
+@users_router.get("/unapproved",
+                  status_code=200,
+                  response_model=list[UserApproved] | UserApproved,
+                  responses={404: {"model": HTTPNotFoundError}}
+                  )
 async def get_unapproved_users(current_user: Users = Depends(get_current_active_user)):
     """
     Список неподтверждённых пользователей (для админа)
@@ -105,11 +129,15 @@ async def get_unapproved_users(current_user: Users = Depends(get_current_active_
             status_code=status.HTTP_200_OK, detail="Пока нет неподтверждённых пользователей"
         )
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail='У вас недостаточно прав для данного действия'
     )
 
 
-@users_router.get("/approved", response_model=list[UserApproved] | UserApproved, status_code=200)
+@users_router.get("/approved",
+                  status_code=200,
+                  response_model=list[UserApproved] | UserApproved,
+                  responses={404: {"model": HTTPNotFoundError}}
+                  )
 async def get_approved_users(current_user: Users = Depends(get_current_active_user)):
     """
     Список подтверждённых пользователей (для админа)
@@ -122,7 +150,7 @@ async def get_approved_users(current_user: Users = Depends(get_current_active_us
             status_code=status.HTTP_200_OK, detail="Пока нет подтверждённых пользователей"
         )
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail="У вас недостаточно прав для данного действия"
     )
 
 
@@ -139,7 +167,11 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return access_token
 
 
-@users_router.post("/register", response_model=User_Pydantic, status_code=201)
+@users_router.post("/register",
+                   status_code=201,
+                   response_model=User_Pydantic,
+                   responses={404: {"model": HTTPNotFoundError}}
+                   )
 async def user_register(user: UserRegister):
     """
     Регистрация пользователя
@@ -159,7 +191,11 @@ async def user_register(user: UserRegister):
     return await User_Pydantic.from_tortoise_orm(new_user)
 
 
-@users_router.post("/create_check", response_model=CreateCheck, status_code=201)
+@users_router.post("/create_check",
+                   status_code=201,
+                   response_model=CreateCheck,
+                   responses={404: {"model": HTTPNotFoundError}}
+                   )
 async def create_check(currency: CurrencyType, current_user: Users = Depends(get_current_active_user)):
     """
     Регистрация нового счёта
@@ -173,7 +209,7 @@ async def create_check(currency: CurrencyType, current_user: Users = Depends(get
         )
 
     # дополнительная проверка на бэке
-    if not (currency in list(CurrencyType)):
+    if currency not in list(CurrencyType):
         raise HTTPException(
             status_code=status.HTTP_200_OK,
             detail=f"Вы не можете создать {currency.name} счёт"
@@ -187,8 +223,9 @@ async def create_check(currency: CurrencyType, current_user: Users = Depends(get
 
 
 @users_router.get("/get_price",
-                  # response_model=CurrencyPrice,
-                  status_code=200
+                  status_code=200,
+                  response_model=CurrencyPrice,
+                  responses={429: {"model": status.HTTP_429_TOO_MANY_REQUESTS}}
                   )
 async def get_price(
         type_from: CurrencyType,
@@ -197,7 +234,7 @@ async def get_price(
         current_user: Users = Depends(get_current_active_user)
 ):
     """
-    Узнать стоимость конвертации
+    Узнать стоимость конвертации (курс)
     """
     try:
         convert = await currency_converter(
@@ -211,7 +248,13 @@ async def get_price(
     return CurrencyPrice(**result)
 
 
-@users_router.get("/get_fluctuation", status_code=200)
+@users_router.get("/get_fluctuation",
+                  status_code=200,
+                  responses={
+                      429: {"model": status.HTTP_429_TOO_MANY_REQUESTS},
+                      404: {"model": HTTPNotFoundError}
+                  }
+                  )
 async def get_fluctuation(
         start_date: date, end_date: date,
         base: CurrencyType, symbols: list[CurrencyType] = Query(...),
@@ -220,7 +263,6 @@ async def get_fluctuation(
     """
     Узнать колебания валют
     """
-
     try:
         convert = await currency_fluctuation(
             start_date=str(start_date),
@@ -237,7 +279,14 @@ async def get_fluctuation(
     return convert
 
 
-@users_router.put("/convert", response_model=list[ConverterCurrency] | ConverterCurrency, status_code=200)
+@users_router.put("/convert",
+                  status_code=200,
+                  response_model=list[ConverterCurrency] | ConverterCurrency,
+                  responses={
+                      429: {"model": status.HTTP_429_TOO_MANY_REQUESTS},
+                      404: {"model": HTTPNotFoundError}
+                  }
+                  )
 async def convert_currency(
         type_from: CurrencyType,
         type_to: CurrencyType,
@@ -257,7 +306,7 @@ async def convert_currency(
     if is_check_from.value < value:
         raise HTTPException(
             status_code=status.HTTP_200_OK,
-            detail=f"У вас недостаточно средствн на {type_from.name} счёту"
+            detail=f"У вас недостаточно средств на {type_from.name} счёту"
         )
 
     is_check_to = await Checks.get_or_none(user_id=current_user.id, currency_type=type_to, is_open=True)
@@ -298,7 +347,11 @@ async def convert_currency(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@users_router.patch("/refill", response_model=CurrencyUpdate, status_code=200)
+@users_router.patch("/refill",
+                    status_code=200,
+                    response_model=CurrencyUpdate,
+                    responses={404: {"model": HTTPNotFoundError}}
+                    )
 async def user_refill(
         amount: Decimal, currency: CurrencyType, current_user: Users = Depends(get_current_active_user)
 ):
@@ -329,7 +382,33 @@ async def user_refill(
     return check
 
 
-@users_router.patch("/unfill", response_model=CurrencyUpdate, status_code=200)
+@users_router.patch("/approve/{user_id}",
+                    status_code=200,
+                    response_model=UserApproved,
+                    responses={404: {"model": HTTPNotFoundError}}
+                    )
+async def user_approve(user_id: int, current_user: Users = Depends(get_current_active_user)):
+    """
+    Подтвержение пользователя администратором
+    """
+    if current_user.is_superuser:
+        _user = await Users.filter(id=user_id, is_approved=False).update(is_approved=True)
+        if not _user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден или уже подтверждён"
+            )
+        user = await Users.get(id=user_id)
+        return UserApproved.from_orm(user)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="У вас недостаточно прав для данного действия"
+    )
+
+
+@users_router.patch("/unfill",
+                    status_code=200,
+                    response_model=CurrencyUpdate,
+                    responses={404: {"model": HTTPNotFoundError}}
+                    )
 async def user_unfill(
         amount: Decimal, currency: CurrencyType, current_user: Users = Depends(get_current_active_user)
 ):
@@ -354,7 +433,9 @@ async def user_unfill(
     # проверка существования счёта
     check = await Checks.get_or_none(user_id=current_user.id, is_open=True, currency_type=currency.name)
     if not check:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Открытые счета не найдены")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Открытый {currency.name} счёт не найден"
+                            )
 
     if amount > check.value:
         raise HTTPException(status_code=status.HTTP_200_OK, detail=f"У нас недостаточно средств")
@@ -364,25 +445,11 @@ async def user_unfill(
     return check
 
 
-@users_router.patch("/approve/{user_id}", response_model=UserApproved, status_code=200)
-async def user_approve(user_id: int, current_user: Users = Depends(get_current_active_user)):
-    """
-    Подтвержение пользователя администратором
-    """
-    if current_user.is_superuser:
-        _user = await Users.filter(id=user_id, is_approved=False).update(is_approved=True)
-        if not _user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден или уже подтверждён"
-            )
-        user = await Users.get(id=user_id)
-        return UserApproved.from_orm(user)
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для данного действия"
-    )
-
-
-@users_router.patch("/block/{user_id}", response_model=UserBlocked, status_code=200)
+@users_router.patch("/block/{user_id}",
+                    status_code=200,
+                    response_model=UserBlocked,
+                    responses={404: {"model": HTTPNotFoundError}}
+                    )
 async def user_block(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
     Блокировка пользователя администратором
@@ -396,13 +463,15 @@ async def user_block(user_id: int, current_user: Users = Depends(get_current_act
         user = await Users.get(id=user_id)
         return UserBlocked.from_orm(user)
     raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас нет прав для данного действия"
+        status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас недостаточно прав для данного действия"
     )
 
 
-@users_router.patch(
-    "/transfer", response_model=TransfersIn_Pydantic, status_code=200
-)
+@users_router.patch("/transfer",
+                    status_code=200,
+                    response_model=TransfersIn_Pydantic,
+                    responses={404: {"model": HTTPNotFoundError}}
+                    )
 async def create_transfer(
         currency: CurrencyType, user_id: int, value: Decimal, current_user: Users = Depends(get_current_active_user)
 ):
@@ -470,9 +539,10 @@ async def create_transfer(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@users_router.get(
-    "/me", response_model=User_Pydantic, responses={404: {"model": HTTPNotFoundError}}
-)
+@users_router.get("/me", status_code=200,
+                  response_model=User_Pydantic,
+                  responses={404: {"model": HTTPNotFoundError}}
+                  )
 async def get_me(current_user: Users = Depends(get_current_active_user)):
     """
     Получить информацию о текущем пользователе
@@ -480,22 +550,26 @@ async def get_me(current_user: Users = Depends(get_current_active_user)):
     return current_user
 
 
-@users_router.get(
-    "/login/{username}", response_model=User_Pydantic, responses={404: {"model": HTTPNotFoundError}}
-)
-async def login(username: str):
-    """
-    Типа логин
-    """
-    return await User_Pydantic.from_queryset_single(Users.get(username=username))
-
-
-@users_router.put(
-    "/update_profile", response_model=User_Pydantic, responses={404: {"model": HTTPNotFoundError}}
-)
+@users_router.put("/update_profile",
+                  status_code=200,
+                  response_model=User_Pydantic,
+                  responses={404: {"model": HTTPNotFoundError}}
+                  )
 async def update_user(user_data: UserUpdate, current_user: Users = Depends(get_current_active_user)):
     """
     Изменить информацию текущего пользователя
     """
     await Users.filter(id=current_user.id).update(**user_data.dict(exclude_unset=True))
     return await User_Pydantic.from_queryset_single(Users.get(id=current_user.id))
+
+
+# @users_router.get("/login/{username}",
+#                   status_code=200,
+#                   response_model=User_Pydantic,
+#                   responses={404: {"model": HTTPNotFoundError}}
+#                   )
+# async def login(username: str):
+#     """
+#     Типа логин
+#     """
+#     return await User_Pydantic.from_queryset_single(Users.get(username=username))
