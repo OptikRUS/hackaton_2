@@ -197,6 +197,13 @@ async def convert_currency(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"У вас нет {type_from.name} счёта или он закрыт"
         )
+
+    if is_check_from.value < value:
+        raise HTTPException(
+            status_code=status.HTTP_200_OK,
+            detail=f"У вас недостаточно средствн на {type_from.name} счёту"
+        )
+
     is_check_to = await Checks.get_or_none(user_id=current_user.id, currency_type=type_to, is_open=True)
     if not is_check_to:
         raise HTTPException(
@@ -267,7 +274,7 @@ async def user_unfill(
         amount: Decimal, currency: CurrencyType, current_user: Users = Depends(get_current_active_user)
 ):
     """
-    Вывод средств с счёта
+    Вывод средств со счёта
     """
     if currency != CurrencyType.RUB:
         raise HTTPException(
@@ -288,6 +295,10 @@ async def user_unfill(
     check = await Checks.get_or_none(user_id=current_user.id, is_open=True, currency_type=currency.name)
     if not check:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Открытые счета не найдены")
+
+    if amount > check.value:
+        raise HTTPException(status_code=status.HTTP_200_OK, detail=f"У нас недостаточно средств")
+
     check.value -= amount
     await check.save()
     return check
@@ -296,7 +307,7 @@ async def user_unfill(
 @users_router.patch("/approve/{user_id}", response_model=UserApproved, status_code=200)
 async def user_approve(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
-    Подтвержени пользователя администратором
+    Подтвержение пользователя администратором
     """
     if current_user.is_superuser:
         _user = await Users.filter(id=user_id, is_approved=False).update(is_approved=True)
@@ -353,6 +364,12 @@ async def create_transfer(
             detail=f"Получатель не найден, заблокирован или не подтверждён"
         )
 
+    if current_user == user_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Вы не можете переводить средства самому себе"
+        )
+
     try:
         async with in_transaction() as connection:
             transfer = Transfers(
@@ -361,10 +378,14 @@ async def create_transfer(
                 value=value,
                 currency_type=currency
             )
-            await transfer.save(using_db=connection)
             check_from = await Checks.get_or_none(
                 user_id=current_user.id, is_open=True, currency_type=currency
             )
+            if check_from.value < value:
+                raise HTTPException(
+                    status_code=status.HTTP_200_OK,
+                    detail=f"У вас недостаточно средствн на {currency.name} счёту"
+                )
             if not check_from:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -380,6 +401,7 @@ async def create_transfer(
                 )
             check_to.value += value
             check_from.value -= value
+            await transfer.save(using_db=connection)
             await check_to.save()
             await check_from.save()
             return await TransfersIn_Pydantic.from_tortoise_orm(transfer)

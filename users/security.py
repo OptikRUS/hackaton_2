@@ -1,13 +1,14 @@
 import time
-from fastapi import HTTPException, status, Depends
 
-from passlib.context import CryptContext
-from fastapi.security import OAuth2PasswordBearer
 import jwt
+from fastapi import HTTPException, status, Depends
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
+from passlib.context import CryptContext
 
-from config import auth_config
+
 from .models import Users as DB_User
+from config import auth_config
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/token")
 pwd_context = CryptContext(schemes=auth_config["hasher_schemes"], deprecated="auto")

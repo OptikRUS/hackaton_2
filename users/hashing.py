@@ -1,5 +1,6 @@
-from config import auth_config
 from passlib.context import CryptContext
+
+from config import auth_config
 
 
 def get_hasher() -> CryptContext:
