@@ -12,8 +12,8 @@ class SiteSettings(BaseSettings):
 
 
 class ApplicationSettings(BaseSettings):
-    title: str = Field("Давай какой нибудь трейдер")
-    description = Field("Какое-то описание")
+    title: str = Field("CurrencyConverter X-Mas Hack")
+    description = Field("Приложения для конвертирования валют")
     debug: bool = Field(True, env="DEBUG")
 
     class Config:

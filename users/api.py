@@ -52,7 +52,7 @@ async def get_history(current_user: Users = Depends(get_current_active_user)):
 @users_router.get("/history", response_model=list[HistoryConvert_Pydantic] | HistoryConvert_Pydantic, status_code=200)
 async def get_user_history(current_user: Users = Depends(get_current_active_user)):
     """
-    История всех ковертаций пользователя
+    История всех конвертаций пользователя
     """
     history = await HistoryConvert_Pydantic.from_queryset(HistoryConvert.filter(user_id=current_user.id))
     if history:
