@@ -67,6 +67,6 @@ class CORSSettings(BaseSettings):
 
 
 class CurrencyApiSettings(BaseSettings):
-    apikey: str = Field("tuCJRjIB6Ywjmei7ckvY2ptAXghNyJ3o", env="API_KEY")
+    apikey: str = Field("YXpVVflN6J5h4FP9ov4zQ89pV651YN12", env="API_KEY")
     url: str = Field("https://api.apilayer.com/currency_data", env="API_URL")
     fluctuation_url: str = Field("https://api.apilayer.com/exchangerates_data/fluctuation", env="API_FLUCTUATION_URL")
