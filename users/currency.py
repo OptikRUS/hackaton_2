@@ -206,3 +206,10 @@ class ConverterCurrency(CreateCurrency):
     currency_type: CurrencyType
     value: Decimal
     updated_at: datetime
+
+
+class CurrencyPrice(BaseModel):
+    type_from: CurrencyType
+    type_to: CurrencyType
+    value: Decimal
+    price: Decimal

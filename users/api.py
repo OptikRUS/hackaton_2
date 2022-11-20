@@ -9,7 +9,7 @@ from tortoise.exceptions import OperationalError
 from .models import (User_Pydantic, Users, Checks, Transfers,
                      TransfersIn_Pydantic, HistoryConvert_Pydantic, HistoryConvert)
 from .schemas import UserRegister, UserApproved, UserBlocked, Token, UserUpdate
-from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency, CurrencyList
+from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency, CurrencyList, CurrencyPrice
 from .converter import currency_converter, currency_list
 
 from .hashing import get_hasher
@@ -179,6 +179,28 @@ async def create_check(currency: CurrencyType, current_user: Users = Depends(get
     await new_check.user_id.add(current_user)
     await new_check.save()
     return CreateCheck.from_orm(new_check)
+
+
+@users_router.get("/get_price", response_model=CurrencyPrice, status_code=200)
+async def get_price(
+        type_from: CurrencyType,
+        type_to: CurrencyType,
+        value: Decimal,
+        current_user: Users = Depends(get_current_active_user)
+):
+    """
+    Узнать стоимость конвертации
+    """
+    try:
+        convert = await currency_converter(
+            currency_from=type_from.name, currency_to=type_to.name, value=str(value)
+        )
+    except ReadTimeout:
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+        )
+    result = dict(type_from=type_from.name, type_to=type_to.name, value=value, price=convert.get('result'))
+    return CurrencyPrice(**result)
 
 
 @users_router.put("/convert", response_model=list[ConverterCurrency] | ConverterCurrency, status_code=200)
