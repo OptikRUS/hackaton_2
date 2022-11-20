@@ -1,4 +1,4 @@
-# CurrencyConverter Sovcombank Team Challenge 2022
+# Currency Converter Sovcombank Team Challenge 2022
 
 ## Приложения для конвертирования валют
 
