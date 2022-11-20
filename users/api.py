@@ -35,7 +35,7 @@ async def get_currency_types(current_user: Users = Depends(get_current_active_us
 @users_router.get("/histories", response_model=list[HistoryConvert_Pydantic], status_code=200)
 async def get_history(current_user: Users = Depends(get_current_active_user)):
     """
-    История всех транзакций
+    История всех конвертаций (только для админа)
     """
     if current_user.is_superuser:
         return await HistoryConvert_Pydantic.from_queryset(HistoryConvert.all())
@@ -55,10 +55,15 @@ async def get_user_history(current_user: Users = Depends(get_current_active_user
 @users_router.get("/checks/{user_id}", response_model=list[CreateCheck], status_code=200)
 async def get_user_checks(user_id: int, current_user: Users = Depends(get_current_active_user)):
     """
-    Счета пользователя для админа
+    Счета пользователя (для админа)
     """
     if current_user.is_superuser:
-        return await Checks.filter(user_id=user_id)
+        check = await Checks.get_or_none(user_id=user_id)
+        if not check:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Нет пользователя с такими счетами"
+            )
+        return check
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN, detail=f"У вас нет прав для данного действия"
     )
@@ -75,7 +80,7 @@ async def get_my_checks(current_user: Users = Depends(get_current_active_user)):
 @users_router.get("/unapproved", response_model=list[UserApproved], status_code=200)
 async def get_unapproved_users(current_user: Users = Depends(get_current_active_user)):
     """
-    Список неподтверждённых пользователей
+    Список неподтверждённых пользователей (для админа)
     """
     if current_user.is_superuser:
         users_list = await Users.filter(is_approved=False, is_superuser=False).all()
@@ -92,7 +97,7 @@ async def get_unapproved_users(current_user: Users = Depends(get_current_active_
 @users_router.get("/approved", response_model=list[UserApproved], status_code=200)
 async def get_approved_users(current_user: Users = Depends(get_current_active_user)):
     """
-    Список подтверждённых пользователей
+    Список подтверждённых пользователей (для админа)
     """
     if current_user.is_superuser:
         users_list = await Users.filter(is_approved=True, is_superuser=False).all()
@@ -317,23 +322,25 @@ async def user_block(user_id: int, current_user: Users = Depends(get_current_act
 @users_router.patch(
     "/transfer", response_model=TransfersIn_Pydantic, status_code=200
 )
-async def create_transfer(transfer_data: Transfer, current_user: Users = Depends(get_current_active_user)):
+async def create_transfer(
+        currency: CurrencyType, user_id: int, value: Decimal, current_user: Users = Depends(get_current_active_user)
+):
     """
-    Перевод
+    Перевод средств между пользователями
     """
     # проверка отправителя
     if not current_user.is_active and not current_user.is_approved:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Поулчатель не найден, заблокирован или не подтверждён"
+            detail=f"Отправитель не найден, заблокирован или не подтверждён"
         )
 
     # проверка получателя
-    user_to = await Users.get_or_none(id=transfer_data.user_to, is_active=True, is_approved=True)
+    user_to = await Users.get_or_none(id=user_id, is_active=True, is_approved=True)
     if not user_to:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Отправитель не найден, заблокирован или не подтверждён"
+            detail=f"Получатель не найден, заблокирован или не подтверждён"
         )
 
     try:
@@ -341,10 +348,30 @@ async def create_transfer(transfer_data: Transfer, current_user: Users = Depends
             transfer = Transfers(
                 user_from=current_user,
                 user_to=user_to,
-                value=transfer_data.value,
-                currency_type=transfer_data.currency_type
+                value=value,
+                currency_type=currency
             )
             await transfer.save(using_db=connection)
+            check_from = await Checks.get_or_none(
+                user_id=current_user.id, is_open=True, currency_type=currency
+            )
+            if not check_from:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Открытый счёт {currency.name} отправителя не найден"
+                )
+            check_to = await Checks.get_or_none(
+                user_id=user_to.id, is_open=True, currency_type=currency
+            )
+            if not check_to:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Открытый счёт {currency.name} получателя не найден"
+                )
+            check_to.value += value
+            check_from.value -= value
+            await check_to.save()
+            await check_from.save()
             return await TransfersIn_Pydantic.from_tortoise_orm(transfer)
 
     except OperationalError as e:
@@ -356,7 +383,7 @@ async def create_transfer(transfer_data: Transfer, current_user: Users = Depends
 )
 async def get_me(current_user: Users = Depends(get_current_active_user)):
     """
-    Получить текущего пользователя
+    Получить информацию о текущем пользователе
     """
     return current_user
 
@@ -376,19 +403,7 @@ async def login(username: str):
 )
 async def update_user(user_data: UserUpdate, current_user: Users = Depends(get_current_active_user)):
     """
-    Изменить информацию пользователя
+    Изменить информацию текущего пользователя
     """
     await Users.filter(id=current_user.id).update(**user_data.dict(exclude_unset=True))
     return await User_Pydantic.from_queryset_single(Users.get(id=current_user.id))
-
-
-# @users_router.delete("/{user_id}", response_model=Status, responses={404: {"model": HTTPNotFoundError}})
-# async def delete_user(user_id: int, current_user: Users = Depends(get_current_active_user)):
-#     """
-#     Удалить пользователя
-#     """
-#
-#     user_is_deleted = await Users.filter(id=user_id).delete()
-#     if not user_is_deleted:
-#         raise HTTPException(status_code=404, detail=f"Пользователь {user_id} не найден")
-#     return Status(message=f"Пользователь {user_id} удалён")
