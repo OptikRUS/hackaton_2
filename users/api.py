@@ -21,7 +21,10 @@ from .security import authenticate_user, get_current_active_user, signJWT
 users_router = APIRouter(prefix="/users", tags=["users"])
 
 
-@users_router.get("/currency_types", response_model=CurrencyList, status_code=200)
+@users_router.get("/currency_types",
+                  # response_model=CurrencyList,
+                  status_code=200
+                  )
 async def get_currency_types(current_user: Users = Depends(get_current_active_user)):
     """
     Расшифровка кодов валют
@@ -183,7 +186,10 @@ async def create_check(currency: CurrencyType, current_user: Users = Depends(get
     return CreateCheck.from_orm(new_check)
 
 
-@users_router.get("/get_price", response_model=CurrencyPrice, status_code=200)
+@users_router.get("/get_price",
+                  # response_model=CurrencyPrice,
+                  status_code=200
+                  )
 async def get_price(
         type_from: CurrencyType,
         type_to: CurrencyType,
@@ -267,6 +273,10 @@ async def convert_currency(
     except ReadTimeout:
         raise HTTPException(
             status_code=status.HTTP_408_REQUEST_TIMEOUT,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
         )
     converter_value = Decimal(convert.get("result"))
     is_check_from.value -= value
