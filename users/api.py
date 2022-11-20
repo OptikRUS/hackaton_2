@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from datetime import date
+
+from fastapi import APIRouter, HTTPException, Depends, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from httpx import ReadTimeout
 from pydantic.types import Decimal
@@ -10,7 +12,7 @@ from .models import (User_Pydantic, Users, Checks, Transfers,
                      TransfersIn_Pydantic, HistoryConvert_Pydantic, HistoryConvert)
 from .schemas import UserRegister, UserApproved, UserBlocked, Token, UserUpdate
 from .currency import CurrencyUpdate, CreateCheck, CurrencyType, ConverterCurrency, CurrencyList, CurrencyPrice
-from .converter import currency_converter, currency_list
+from .converter import currency_converter, currency_list, currency_fluctuation
 
 from .hashing import get_hasher
 from .security import authenticate_user, get_current_active_user, signJWT
@@ -201,6 +203,32 @@ async def get_price(
         )
     result = dict(type_from=type_from.name, type_to=type_to.name, value=value, price=convert.get('result'))
     return CurrencyPrice(**result)
+
+
+@users_router.get("/get_fluctuation", status_code=200)
+async def get_fluctuation(
+        start_date: date, end_date: date,
+        base: CurrencyType, symbols: list[CurrencyType] = Query(...),
+        current_user: Users = Depends(get_current_active_user)
+):
+    """
+    Узнать колебания валют
+    """
+
+    try:
+        convert = await currency_fluctuation(
+            start_date=str(start_date),
+            end_date=str(end_date),
+            base=base.name,
+            symbols=','.join(list(map(lambda symbol: symbol.name, symbols)))
+        )
+    except ReadTimeout:
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return convert
 
 
 @users_router.put("/convert", response_model=list[ConverterCurrency] | ConverterCurrency, status_code=200)
